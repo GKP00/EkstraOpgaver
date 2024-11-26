@@ -54,9 +54,17 @@ namespace EkstraOpgaver
     {
       int talVærdi = 0;
 
+      bool negativ = false;
+
       //iterer fra højre til venste i strengen
       for (int i = tal.Length - 1; i >= 0; --i)
       {
+        if (i == 0 && tal[i] == '-')
+        {
+          negativ = true;
+          continue;
+        }
+
         int plads = tal.Length - i - 1;  
         int pladsVærdi  = (int)Math.Pow((int)talsystem, plads); 
         int cifferVærdi = CifferTilVærdi(tal[i]);
@@ -66,13 +74,17 @@ namespace EkstraOpgaver
         talVærdi += cifferVærdi * pladsVærdi;
       }
 
-      return talVærdi;
+      return negativ ? -talVærdi : talVærdi;
     }
 
     //konverterer en int værdi til en tal string i et talsystem
     static string VærdiTilTal(Talsystem talsystem, int værdi)
     {
       StringBuilder sb = new StringBuilder();
+
+      //jeg håndterer negative værdier ved at lave dem om til positive, og så sætter jeg bare et '-' på inden jeg returnerer
+      bool negativ = værdi < 0;
+      værdi = Math.Abs(værdi);
 
       //hvor mange gange basen går op i værdien
       int nGårOpI  = værdi / (int)talsystem;
@@ -90,6 +102,9 @@ namespace EkstraOpgaver
         nGårOpI = nGårOpI / (int)talsystem;
       }
 
+      if(negativ)
+        sb.Insert(0, '-');
+
       sb.Append($" ({(int)talsystem})"); //til sidst appender jeg et postfix så man kan se hvilke base tallet er
       return sb.ToString();
     }
@@ -97,8 +112,14 @@ namespace EkstraOpgaver
     //validerer at hver ciffer i tallet er inden for talsystemet
     static void ValiderTal(Talsystem talsystem, string tal)
     {
-      foreach (char ciffer in tal)
-        ValiderCiffer(talsystem, CifferTilVærdi(ciffer));
+      for (int i = 0; i < tal.Length; ++i)
+      {
+        //ignorer evt. minus tegn
+        if (i == 0 && tal[i] == '-')
+          continue;
+
+        ValiderCiffer(talsystem, CifferTilVærdi(tal[i]));
+      }
     }
 
     //Finder ud af hvilket talsystem inputtet er givet i ved at tjekke for et prefix eller postfix
