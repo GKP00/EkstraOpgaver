@@ -2,23 +2,21 @@
 
 namespace EkstraOpgaver
 {
-
   class KonverterTalsystemer
   {
     enum Talsystem
     {
-      DEC = 10,
       BIN =  2,
-      HEX = 16,
       OCT =  8,
+      DEC = 10,
+      HEX = 16,
     }
 
-    static Dictionary<Talsystem, string[]> Prefixes = new Dictionary<Talsystem, string[]>()
+    static Dictionary<Talsystem, string[]> AlternativePrefixes = new Dictionary<Talsystem, string[]>
     {
-      {Talsystem.DEC, new string[]{"DEC"} },
-      {Talsystem.BIN, new string[]{"BIN","0b"} },
-      {Talsystem.HEX, new string[]{"HEX","0x"} },
-      {Talsystem.OCT, new string[]{"OCT","0o"} },
+      {Talsystem.BIN, new string[]{"0b"} },
+      {Talsystem.OCT, new string[]{"0o"} },
+      {Talsystem.HEX, new string[]{"0x"} },
     };
 
     //konverterer fra char til int værdi 
@@ -27,9 +25,9 @@ namespace EkstraOpgaver
       //finder ciffer værdien ved at udregne cifferets offset i ASCII tabellen fra '0' når cifferet er mellem '0' og '9'
       //ved alfabetiske værdier (a-z) udregner jeg offsetet fra 'a' når cifferet er mellem 'a' og 'z' og lægger 10 til da efter '9'
       //vil 'a' være det 10. nummer
-      return cifferChar >= '0' && cifferChar <= '9' ? 0  + (cifferChar - '0') :
-             cifferChar >= 'a' && cifferChar <= 'z' ? 10 + (cifferChar - 'a') :
-             cifferChar >= 'A' && cifferChar <= 'Z' ? 10 + (cifferChar - 'A') :
+      return cifferChar >= '0' && cifferChar <= '9' ? (cifferChar - '0') :
+             cifferChar >= 'a' && cifferChar <= 'z' ? (cifferChar - 'a') + 10 :
+             cifferChar >= 'A' && cifferChar <= 'Z' ? (cifferChar - 'A') + 10 :
              throw new Exception($"ukendt ciffer '{cifferChar}', kunne ikke konvertere det til en værdi.");
     }
 
@@ -43,32 +41,27 @@ namespace EkstraOpgaver
     }
 
     //validerer at værdien er mellem 0 og talsystemets base
-    static bool ValiderCiffer(Talsystem talsystem, int cifferVærdi)
+    static bool ValiderCiffer(Talsystem talsystem, char cifferChar)
     {
+      int cifferVærdi = CifferTilVærdi(cifferChar);
       return cifferVærdi >= 0 && cifferVærdi < (int)talsystem ? true :
-             throw new Exception($"ukorrekt ciffer inden for {talsystem} talsystemet");
+             throw new Exception($"ukorrekt ciffer '{cifferChar}' inden for {talsystem} talsystemet");
     }
 
     //konverterer en tal string til en int værdi
     static int TalTilVærdi(Talsystem talsystem, string tal)
     {
       int talVærdi = 0;
+      bool negativ = tal.StartsWith('-');
 
-      bool negativ = false;
-
-      //iterer fra højre til venste i strengen
-      for (int i = tal.Length - 1; i >= 0; --i)
+      //string index er højre til venste, men vi tænker på ciffre i et tal som at gå fra venstre til højre
+      //så jeg iterere fra enden a stringen til starten 
+      for (int i = tal.Length-1; i >= (negativ ? 1 : 0); --i)
       {
-        if (i == 0 && tal[i] == '-')
-        {
-          negativ = true;
-          continue;
-        }
-
-        int plads = tal.Length - i - 1;  
+        int plads = tal.Length-1 - i;
         int pladsVærdi  = (int)Math.Pow((int)talsystem, plads); 
         int cifferVærdi = CifferTilVærdi(tal[i]);
-        ValiderCiffer(talsystem, cifferVærdi);
+        ValiderCiffer(talsystem, tal[i]);
 
         //talVærdien går på med cifferværdi gange med pladsværdi
         talVærdi += cifferVærdi * pladsVærdi;
@@ -118,43 +111,93 @@ namespace EkstraOpgaver
         if (i == 0 && tal[i] == '-')
           continue;
 
-        ValiderCiffer(talsystem, CifferTilVærdi(tal[i]));
+        ValiderCiffer(talsystem, tal[i]);
       }
+    }
+
+    static (Talsystem talsystem, string tal)? LedEfterTalMedPrimærPrefix(string input, Talsystem talsystem)
+    {
+      //hver enum værdi i koden er allerede navngivet efter deres prefix, så jeg ToString()'er bare:
+      string prefix = talsystem.ToString();
+
+      if (input.StartsWith(prefix))
+      {
+        string talVærdi = input.Substring(prefix.Length);
+        talVærdi = talVærdi.TrimStart(); //fjern evt. mellemrum (fks i "HEX FF")
+        return (talsystem, talVærdi);
+      }
+
+      return null;
+    }
+
+    static (Talsystem talsystem, string tal)? LedEfterTalMedAlternativtPrefix(string input, Talsystem talsystem)
+    {
+      //led kun efter alternative prefixes hvis det findes for talsystemet:
+      if (!AlternativePrefixes.ContainsKey(talsystem))
+        return null;
+
+      //de alternative prefixes må gerne have et minus tegn før (fks: -0xFF)
+      //jeg håndterer dette ved at fjerne tegnet og så sætte det tilbage efter
+      bool negativt = false;
+      if (input.StartsWith('-'))
+      {
+        input = input.TrimStart('-');
+        negativt = true;
+      }
+
+      //led efter et af de alternative prefixes:
+      foreach (string alprefix in AlternativePrefixes[talsystem])
+      {
+        if (!input.StartsWith(alprefix))
+          continue;
+
+        //lav en ny string fra inputtet uden prefixet
+        string talVærdi = input.Substring(alprefix.Length);
+
+        //sætter minus tegnet tilbage hvis det var negativt
+        if (negativt)
+          talVærdi = '-' + talVærdi;
+
+        return (talsystem, talVærdi);
+      }
+
+      return null;
+    }
+
+    static (Talsystem talsystem, string tal)? LedEfterTalMedPostfix(string input, Talsystem talsystem)
+    {
+      //hver enum værdi er nummeret på talsystemets base, så postfix stringen kan bare konstrueres:
+      string postfix = $"({(int)talsystem})";
+
+      //tjek om inputtet slutter med postfixet
+      if (input.EndsWith(postfix))
+      {
+        //lav en ny string fra inputtet uden postfix
+        string talVærdi = input.Substring(0, input.Length - postfix.Length);
+        talVærdi = talVærdi.TrimEnd();   //fjern evt. mellemrum i enden (fks: "44 (8)")
+        return (talsystem, talVærdi);
+      }
+
+      return null;
     }
 
     //Finder ud af hvilket talsystem inputtet er givet i ved at tjekke for et prefix eller postfix
     //returnerer talsystemet samt efterfølgende eller førfølgende string 
     static (Talsystem talsystem, string tal) AnalyserTal(string input)
     {
-      //iterer gennem de definerede talsystemer "Talsystem" 
-      foreach(Talsystem talsystem in Enum.GetValues(typeof(Talsystem)))
+      foreach (Talsystem talsystem in Enum.GetValues(typeof(Talsystem)))
       {
-        //led efter et prefix i de definierede Prefixes for talsystemet:
-        foreach (string prefix in Prefixes[talsystem])
-        {
-          //tjek om inputtet begynder med prefixet
-          if (input.StartsWith(prefix))
-          {
-            //lav en ny string fra inputtet uden prefixet
-            string talVærdi = input.Substring(prefix.Length);
-            talVærdi = talVærdi.TrimStart(); //fjern evt. mellemrum i starten
-            talVærdi = talVærdi.TrimEnd();   //fjern evt. mellemrum i enden
-            return (talsystem, talVærdi);
-          }
-        }
+        var talOgTalsystem = LedEfterTalMedPrimærPrefix(input,talsystem);
+        if (talOgTalsystem != null)
+          return talOgTalsystem.Value;
 
-        //hver enum værdi er nummeret på talsystemets base, så postfix stringen kan bare konstrueres:
-        string postfix = $"({(int)talsystem})";
+        talOgTalsystem = LedEfterTalMedAlternativtPrefix(input,talsystem);
+        if (talOgTalsystem != null)
+          return talOgTalsystem.Value;
 
-        //tjek om inputtet slutter med postfixet
-        if (input.EndsWith(postfix))
-        {
-          //lav en ny string fra inputtet uden postfix
-          string talVærdi = input.Substring(0, input.Length-postfix.Length);
-          talVærdi = talVærdi.TrimStart(); //fjern evt. mellemrum i starten
-          talVærdi = talVærdi.TrimEnd();   //fjern evt. mellemrum i enden
-          return (talsystem, talVærdi);
-        }
+        talOgTalsystem = LedEfterTalMedPostfix(input,talsystem);
+        if (talOgTalsystem != null)
+          return talOgTalsystem.Value;
       }
 
       //Hvis der ikke blev fundet noget prefix eller postfix antager vi at det er DEC
@@ -175,10 +218,15 @@ namespace EkstraOpgaver
         try
         {
           Console.Write("Indtast et tal (fks: 42, BIN 10, 35 (8), 0xFF): ");
-          var talOgSystem = AnalyserTal(Console.ReadLine());
+          string input = Console.ReadLine().TrimStart().TrimEnd();
+
+
+          var talOgSystem = AnalyserTal(input);
           ValiderTal(talOgSystem.talsystem, talOgSystem.tal);
+
           Console.Write("Indtast den base du vil konverterer til som et nummer (fks: 2): ");
           var konverterTil = (Talsystem) int.Parse(Console.ReadLine());
+
           Console.WriteLine(KonverterTal(talOgSystem.talsystem, talOgSystem.tal, konverterTil));
         }
         catch(Exception e)
