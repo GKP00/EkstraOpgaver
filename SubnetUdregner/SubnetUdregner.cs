@@ -33,8 +33,8 @@ Console.WriteLine();
 for(int i = 0; i < ipSomBinær.Length; ++i)
 {
   PrintMedFarve(ipSomBinær[i],
-    i <= ipOgCidr.cidr ? ConsoleColor.Blue :
-    i <= ipOgCidr.cidr+subnetBits ? ConsoleColor.Red : null);
+    i < ipOgCidr.cidr ? ConsoleColor.Blue :
+    i < ipOgCidr.cidr+subnetBits ? ConsoleColor.Red : null);
 
   if(i+1 < ipSomBinær.Length && (i+1) % 8 == 0)
     Console.Write('.');
